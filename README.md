@@ -1,65 +1,155 @@
-# AST Calculator — Bridge Design Pattern
+# AST Calculator — Facade Design Pattern
 
 ![Java](https://img.shields.io/badge/Language-Java%2021%2B-orange.svg)
-![Design Pattern](https://img.shields.io/badge/Pattern-Bridge%20(GoF)-blue.svg)
+![Design Pattern](https://img.shields.io/badge/Pattern-Facade%20(GoF)-blue.svg)
 ![Clean Code](https://img.shields.io/badge/Clean%20Code-Adherent-green.svg)
 
-An arithmetic expression calculator with a genuine compiler front-end (**Lexer $\rightarrow$ Recursive Descent Parser $\rightarrow$ Abstract Syntax Tree**) whose evaluation engine is decoupled using the **Gang of Four (GoF) Bridge Pattern**.
+An arithmetic expression compiler and computation engine featuring a multi-stage compiler pipeline (**Lexical Scanner $\rightarrow$ Recursive Descent Parser $\rightarrow$ Abstract Syntax Tree**) and dual arithmetic backends (**IEEE-754 64-bit float vs. Arbitrary-Precision BigDecimal**), encapsulated behind the **Gang of Four (GoF) Facade Pattern**.
 
 ---
 
-## 1. Project Overview
+## 1. Problem Statement & Motivation
 
-Most classic demonstrations of the Bridge pattern rely on textbook examples like *Shapes & Renderers* or *Remotes & Devices*. This project implements an original, domain-rich architecture:
+Directly evaluating mathematical expressions without a facade requires client applications to coordinate a complex, multi-stage subsystem:
+1. Initialize the `Lexer` with character streams and track cursors.
+2. Tokenize and pass the `Token` list into a recursive descent `Parser`.
+3. Handle AST grammar validation and node hierarchies (`Expr`).
+4. Select, configure, and bind a numeric execution backend (`DoubleMathEngine` vs. `BigDecimalMathEngine` with `MathContext`).
+5. Select a calculator abstraction (`StandardCalculator` vs. `TracedCalculator`).
+6. Catch and resolve low-level compiler diagnostics (`LexException`, `ParseException`, `ArithmeticException`).
 
-* **Compiler Front-End:** Tokenizes raw mathematical strings into a stream of records, enforces formal context-free grammar, provides pinpoint character-level syntax error reporting, and produces a type-safe Abstract Syntax Tree (`Expr`).
-* **The Bridge Pattern:** Decouples **high-level AST evaluation and execution observation** (`Calculator` abstraction) from the **underlying numeric representation and arithmetic computation** (`MathEngine` implementor).
+This tight coupling forces clients to understand internal compilation mechanics and arithmetic engine configuration. The **Facade Pattern** solves this by providing unified, high-level interfaces that shield clients from subsystem complexity while keeping the subsystem classes modular, independently usable, and unaware of the facade.
 
 ---
 
 ## 2. Technical Requirements Mapping
 
-This implementation maps directly to the technical requirements specified for the Bridge pattern:
-
-| Bridge Component           | Class / Interface            | Responsibility                                                                                                                             |
-|:---------------------------|:-----------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------|
-| **Abstraction**            | `abstract class Calculator`  | Holds a protected reference to `MathEngine`. Orchestrates lexing, parsing, and post-order AST evaluation via template hooks.               |
-| **Refined Abstraction 1**  | `class StandardCalculator`   | Evaluates expressions silently and returns the final computed string result.                                                               |
-| **Refined Abstraction 2**  | `class TracedCalculator`     | Evaluates expressions while recording and printing every intermediate reduction step (execution tracing).                                  |
-| **Implementor**            | `interface MathEngine`       | Declares primitive low-level arithmetic operations (`add`, `subtract`, `multiply`, `divide`, `power`, `negate`, `parseLiteral`, `format`). |
-| **Concrete Implementor 1** | `class DoubleMathEngine`     | Implements fast, hardware-accelerated 64-bit IEEE-754 floating-point arithmetic (`double`).                                                |
-| **Concrete Implementor 2** | `class BigDecimalMathEngine` | Implements exact, arbitrary-precision decimal arithmetic using `java.math.BigDecimal` and `MathContext`.                                   |
-| **Client**                 | `class Main`                 | Composes abstractions with implementors at runtime and demonstrates switching engines on the fly without changing the abstraction.         |
+| Assignment Requirement             | Implementation in Project                             | Details                                                                                                                                          |
+|:-----------------------------------|:------------------------------------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Complex Subsystem (4+ Classes)** | `Lexer`, `Parser`, `Expr`, `Calculator`, `MathEngine` | Real, non-trivial interactions: token stream generation, recursive descent CFG parsing, tree evaluation, and multi-precision arithmetic.         |
+| **Main Facade**                    | `class CalculatorFacade`                              | Exposes a streamlined API (`calculate`, `calculateWithTrace`, `isValid`) coordinating engine binding, AST compilation, and calculation modes.    |
+| **Additional Facade (Optional)**   | `class FrontendFacade`                                | A dedicated secondary facade in `calculator.frontend` exposing AST compilation and syntax tree inspection without evaluating.                    |
+| **Client**                         | `class Main` / External Consumers                     | Interacts exclusively via the Facade API—never instantiates internal subsystem classes directly.                                                 |
+| **Zero Back-References**           | All subsystem classes                                 | Subsystem classes (`Lexer`, `Parser`, `DoubleMathEngine`, etc.) have **zero imports or dependencies** on `CalculatorFacade` or `FrontendFacade`. |
+| **Subsystem Bypassability**        | Advanced client support                               | Power users and compiler tools can bypass both facades to inspect tokens, construct custom ASTs, or implement custom math engines directly.      |
 
 ---
 
-## 3. Formal Grammar & Compiler Front-End
+## 3. Architecture & Structural Diagram
 
-The parser implements a **Deterministic Recursive Descent Parser** adhering to the following Context-Free Grammar (CFG) in Extended Backus-Naur Form (EBNF):
+### Dual-Facade Architecture
 
-### EBNF Grammar Specification
+```
+                             +-----------------------------------+
+                             |              CLIENT               |
+                             +-----------------------------------+
+                                       /               \
+              High-level evaluation   /                 \  Static AST analysis
+                                     v                   v
+                    +--------------------+   +--------------------+
+                    |  CalculatorFacade  |   |   FrontendFacade   |
+                    +--------------------+   +--------------------+
+                               |                       |
+   ============================|=======================|=============================
+   COMPLEX SUBSYSTEM BOUNDARY  |                       |   (Zero back-references)
+                               v                       v
+               +------------------------------------------------+
+               |              FRONTEND SUBSYSTEM                |
+               |   Lexer  ──►  Token  ──►  Parser  ──►  Expr    |
+               +------------------------------------------------+
+                                       |
+                                       v (AST Traversal)
+               +------------------------------------------------+
+               |              EVALUATION SUBSYSTEM              |
+               |           Calculator (Standard / Traced)       |
+               |                          │                     |
+               |                          ▼                     |
+               |         MathEngine (Double / BigDecimal)       |
+               +------------------------------------------------+
+```
+
+### Detailed Component Roles
+
+* **Primary Facade (`CalculatorFacade`):** Orchestrates the full lifecycle of a mathematical evaluation. It instantiates the default `DoubleMathEngine`, coordinates `StandardCalculator` and `TracedCalculator`, manages runtime `BigDecimal` precision, validates input, and translates subsystem exceptions into unified `CalculationException` instances.
+* **Secondary Facade (`FrontendFacade`):** Segregates static language processing from execution. It coordinates `Lexer` and `Parser` to produce an `Expr` AST or an ASCII syntax tree without executing arithmetic.
+* **Complex Subsystem Classes:**
+   * `Lexer`: Scans input strings into typed tokens with exact character index tracking.
+   * `Parser`: Enforces precedence and associativity using recursive descent.
+   * `Expr` (`Number`, `Unary`, `Binary`): Sealed composite AST node hierarchy.
+   * `Calculator` (`StandardCalculator`, `TracedCalculator`): Traverses the AST using Template Method hooks.
+   * `MathEngine` (`DoubleMathEngine`, `BigDecimalMathEngine`): Implements IEEE-754 or arbitrary-precision `MathContext` arithmetic.
+
+---
+
+## 4. Five Clean Code Principles (Justifications)
+
+### 1. Meaningful Names (Self-Explanatory Facade API)
+The public methods of `CalculatorFacade` reflect **client intent** rather than technical subsystem steps:
+* Subsystem operations are granular and imperative: `lexer.tokenize()`, `parser.expression()`, `engine.parseLiteral()`.
+* The Facade abstracts these into intuitive, declarative methods:
+   * `calculate(expression)` — evaluates using standard 64-bit IEEE-754 hardware precision.
+   * `calculate(expression, precision)` — evaluates using arbitrary-precision decimal arithmetic.
+   * `calculateWithTrace(expression)` — executes step-by-step diagnostic reduction.
+   * `isValid(expression)` — validates expression grammar without executing.
+
+### 2. Single Responsibility Principle (SRP)
+The Facade **coordinates; it does not compute**.
+* `CalculatorFacade` contains zero lexing rules, zero grammar verification code, and zero arithmetic logic.
+* All parsing logic remains strictly within `Parser`, all tokenization remains within `Lexer`, and all mathematical operations remain within `MathEngine`. The Facade solely acts as a traffic controller ensuring subsystem components interact in the proper sequence.
+
+### 3. No Leaking of Subsystem Details (Information Hiding)
+The Facade forms a strict abstraction barrier:
+* `CalculatorFacade` accepts only standard types (`String`, `int`) and returns formatted `String` or `boolean` results.
+* Internal subsystem abstractions (`Token`, `TokenType`, `Expr`, `MathEngine`, `MathContext`) are completely shielded from the client.
+* Low-level subsystem exceptions (`SyntaxException`, `ParseException`, `ArithmeticException`) are intercepted and converted into a unified domain exception (`CalculationException`), preventing parser state leakage.
+
+### 4. Small, Focused Subsystem Classes (High Cohesion)
+Because `CalculatorFacade` and `FrontendFacade` take on the burden of wiring and lifecycle coordination, subsystem classes remain small, focused, and cohesive:
+* `Lexer` (105 lines) only scans characters into tokens.
+* `Parser` (135 lines) only enforces grammar rules.
+* `BigDecimalMathEngine` only performs arithmetic under a given `MathContext`.
+  None of these classes need boilerplate convenience methods or coordination logic to accommodate external clients.
+
+### 5. Proper Error Handling for Coordination Failures
+A core responsibility of a robust Facade is shielding clients from multi-layer failure cascades:
+* If input is malformed, `Lexer` or `Parser` throws a `SyntaxException` with character-level cursor information.
+* If a division by zero occurs, `MathEngine` throws an `ArithmeticException`.
+* `CalculatorFacade` captures these distinct subsystem failures, protects client execution flow, and rethrows a descriptive `CalculationException` containing the underlying cause:
+  ```java
+  try {
+      return calculator.calculate(expression);
+  } catch (SyntaxException | ArithmeticException e) {
+      throw new CalculationException("Calculation failed: " + e.getMessage());
+  }
+  ```
+
+---
+
+## 5. Formal Grammar & Compiler Subsystem
+
+The underlying frontend subsystem implements a **Deterministic Recursive Descent Parser** adhering to the following Context-Free Grammar (CFG) in Extended Backus-Naur Form (EBNF):
+
 ```ebnf
 expression ::= term ( ( "+" | "-" ) term )*
 term       ::= unary ( ( "*" | "/" ) unary )*
-unary      ::= "-" unary | power                 (* Prefix negation *)
+unary      ::= "-" unary | power                 (* Right-associative prefix negation *)
 power      ::= primary ( "^" unary )?            (* Right-associative exponentiation *)
 primary    ::= NUMBER | "(" expression ")"
 NUMBER     ::= [0-9]+ ( "." [0-9]+ )?
 ```
 
-### Operator Precedence & Associativity
+### Precedence & Associativity Table
 
-| Precedence Level |    Operators    | Description                             | Associativity | Grammar Method |
-|:----------------:|:---------------:|:----------------------------------------|:-------------:|:---------------|
-| **1 (Highest)**  | Literals, `( )` | Numbers and explicit groupings          |      N/A      | `primary()`    |
-|      **2**       |       `^`       | Exponentiation (e.g. `2 ^ 3 ^ 2 = 512`) | Right-to-Left | `power()`      |
-|      **3**       |       `-`       | Unary negation (e.g. `-2 ^ 2 = -4`)     | Right-to-Left | `unary()`      |
-|      **4**       |    `*`, `/`     | Multiplicative operations               | Left-to-Right | `term()`       |
-|  **5 (Lowest)**  |    `+`, `-`     | Additive operations                     | Left-to-Right | `expression()` |
+|   Precedence    |    Operators    | Description                        | Associativity | Subsystem Method      |
+|:---------------:|:---------------:|:-----------------------------------|:-------------:|:----------------------|
+| **1 (Highest)** | Literals, `( )` | Numbers and sub-expressions        |      N/A      | `Parser.primary()`    |
+|      **2**      |       `^`       | Exponentiation (`2 ^ 3 ^ 2 = 512`) | Right-to-Left | `Parser.power()`      |
+|      **3**      |       `-`       | Prefix negation (`-2 ^ 2 = -4`)    | Right-to-Left | `Parser.unary()`      |
+|      **4**      |    `*`, `/`     | Multiplication, Division           | Left-to-Right | `Parser.term()`       |
+| **5 (Lowest)**  |    `+`, `-`     | Addition, Subtraction              | Left-to-Right | `Parser.expression()` |
 
-### Error Diagnostics
-When invalid syntax or unexpected tokens are encountered, the compiler front-end generates compiler-grade visual diagnostics with exact position indicators:
-
+### Compiler Diagnostic Errors
+When an invalid expression bypasses client-side validation, the subsystem produces compiler-grade visual diagnostics:
 ```text
   3 + * 4
       ^
@@ -68,73 +158,36 @@ Parse Error: Expected number or '(' but found: '*'
 
 ---
 
-## 4. Architecture & UML Diagram
-
-```
-                             THE BRIDGE
-  [ Abstraction Hierarchy ]              [ Implementor Hierarchy ]
-        Calculator  ────────(bridge)────────►  MathEngine
-            ▲                                      ▲
-            │                                      │
-     ┌──────┴─────────────┐                 ┌──────┴────────────────┐
-     │                    │                 │                       │
-StandardCalculator  TracedCalculator  DoubleMathEngine  BigDecimalMathEngine
-```
-
-### Complete Class Diagram
-![UML Diagram](docs/uml_diagram.png)
-
----
-
-## 5. Five Clean Code Principles (Justifications)
-
-1. **Clear Separation of Abstraction vs. Implementor (Information Hiding):**
-   * The abstraction layer (`Calculator`) only knows the high-level tree traversal algorithm. It never depends on `double` or `BigDecimal`.
-   * Low-level details (such as `MathContext` or IEEE-754 bit representations) remain strictly encapsulated inside the concrete implementors.
-2. **Open/Closed Principle (OCP):**
-   * The architecture is open for extension but closed for modification. Adding a new `FractionMathEngine` (for exact rational math $1/3$) requires creating **one** class implementing `MathEngine`.
-   * Zero lines of code in `Lexer`, `Parser`, `Expr`, or `Calculator` need to be modified.
-3. **Single Responsibility Principle (SRP):**
-   * `Lexer`: Scans raw characters into token records.
-   * `Parser`: Enforces grammar rules and constructs the syntax tree.
-   * `Calculator`: Coordinates the evaluation pipeline and output presentation.
-   * `MathEngine`: Computes mathematical operations.
-4. **Don't Repeat Yourself (DRY) via the Template Method Pattern:**
-   * Recursive tree evaluation logic is written **once** in `Calculator.evaluate(Expr)`.
-   * Refined abstractions (`StandardCalculator` and `TracedCalculator`) do not duplicate AST traversal; they only implement lightweight hook methods (`onLiteral`, `onBinary`, `onUnary`).
-5. **Preserving Domain Precision at Architectural Boundaries:**
-   * `Expr.Number` stores its numeric value as a raw `String literal` rather than immediately parsing it to a `double`.
-   * This prevents premature precision loss (e.g. `"0.1"` becoming `0.10000000000000000555...` due to binary float rounding) before the `BigDecimalMathEngine` has a chance to parse it.
-
----
-
-## 6. Project Structure
+## 6. Project Directory Structure
 
 ```text
 src/
 └── calculator/
-    ├── Main.java                          # Client application demonstrating runtime switching
+    ├── Main.java                          # Client application
+    ├── CalculatorFacade.java              # PRIMARY FACADE (Evaluations & Engine Wiring)
+    ├── CalculationException.java          # Unified exception shielding subsystem errors
     │
-    ├── frontend/                          # Compiler Front-End
-    │   ├── TokenType.java                 # Enum representing token categories
-    │   ├── Token.java                     # Record holding token type, lexeme, and source cursor position
-    │   ├── Lexer.java                     # Cursor-based lexical scanner
+    ├── frontend/                          # Subsystem: Compiler Front-End
+    │   ├── FrontendFacade.java            # SECONDARY FACADE (AST Compilation & Tree Dump)
+    │   ├── TokenType.java                 # Token classification enum
+    │   ├── Token.java                     # Immutable token record
+    │   ├── Lexer.java                     # Lexical character scanner
     │   ├── Parser.java                    # Recursive descent parser
-    │   ├── Expr.java                      # AST Node hierarchy (Number, Binary, Unary)
-    │   ├── SyntaxException.java           # Base exception formatting visual caret error markers
-    │   ├── LexException.java              # Scanner-level error (unexpected characters)
-    │   └── ParseException.java            # Grammar/token error (unexpected tokens)
+    │   ├── Expr.java                      # Sealed AST hierarchy (Number, Binary, Unary)
+    │   ├── SyntaxException.java           # Visual diagnostic base exception
+    │   ├── LexException.java              # Scanner syntax error
+    │   └── ParseException.java            # Grammar syntax error
     │
-    └── bridge/                            # The Bridge Pattern
-        ├── abstraction/                   # Abstraction Side
-        │   ├── Calculator.java            # Base abstraction (orchestrates parsing & evaluation)
-        │   ├── StandardCalculator.java    # Refined Abstraction 1 (silent calculation)
-        │   └── TracedCalculator.java      # Refined Abstraction 2 (step-by-step trace)
+    └── bridge/                            # Subsystem: Arithmetic & Evaluation Engines
+        ├── abstraction/
+        │   ├── Calculator.java            # Evaluator base (coordinates via FrontendFacade)
+        │   ├── StandardCalculator.java    # Silent AST evaluator
+        │   └── TracedCalculator.java      # Step-by-step diagnostic evaluator
         │
-        └── implementation/                # Implementation Side
-            ├── MathEngine.java            # Implementor interface
-            ├── DoubleMathEngine.java      # Concrete Implementor 1 (IEEE-754 64-bit float)
-            └── BigDecimalMathEngine.java  # Concrete Implementor 2 (Arbitrary precision)
+        └── implementation/
+            ├── MathEngine.java            # Numeric computation SPI
+            ├── DoubleMathEngine.java      # IEEE-754 hardware floating-point engine
+            └── BigDecimalMathEngine.java  # Arbitrary-precision decimal engine
 ```
 
 ---
@@ -144,15 +197,15 @@ src/
 ### Prerequisites
 * Java JDK 21 or higher.
 
-### Compile
-From the `src` directory:
+### Compilation
+From the project root:
 ```bash
-javac calculator/Main.java calculator/frontend/*.java calculator/bridge/abstraction/*.java calculator/bridge/implementation/*.java
+javac -d out --source-path src src/calculator/*.java
 ```
 
-### Run
+### Execution
 ```bash
-java calculator.Main
+java -cp out calculator.Main
 ```
 
 ---
@@ -161,45 +214,43 @@ java calculator.Main
 
 ```text
 ==================================================
-   SOFTWARE DESIGN PATTERNS - BRIDGE PATTERN DEMO 
+  SOFTWARE DESIGN PATTERNS - FACADE PATTERN DEMO    
 ==================================================
 
---- DEMO 1: Runtime Implementor Switching ---
-Evaluating: 0.1 + 0.2
-Using: IEEE-754 64-bit Double Engine
-Result -> 0.30000000000000004
+1. Standard Evaluation:
+   Expr:   10 / 3 + 2 * 4
+   Result: 11.333333333333334
 
->> [RUNTIME SWAP] Switching engine to BigDecimalMathEngine <<
+2. High Precision (50 digits):
+   Expr:   0.1 + 0.2
+   Result: 0.3
 
-Using: Arbitrary-Precision BigDecimal Engine (40 digits)
-Result -> 0.3
-
---- DEMO 2: Refined Abstraction (Step-by-Step Trace) ---
+3. Traced Evaluation:
 ==================================================
 Tracing Expression: 3 + 4 * (2 - 1) ^ 3
-Active Backend:     Arbitrary-Precision BigDecimal Engine (40 digits)
---------------------------------------------------
-  Step 01: [LITERAL] Read '3' -> 3
-  Step 02: [LITERAL] Read '4' -> 4
-  Step 03: [LITERAL] Read '2' -> 2
-  Step 04: [LITERAL] Read '1' -> 1
-  Step 05: [BINARY]  2 MINUS 1 = 1
-  Step 06: [LITERAL] Read '3' -> 3
-  Step 07: [BINARY]  1 CARET 3 = 1
-  Step 08: [BINARY]  4 STAR 1 = 4
-  Step 09: [BINARY]  3 PLUS 4 = 7
---------------------------------------------------
-Final Result: 7
-==================================================
-
-==================================================
-Tracing Expression: 10 / 3
 Active Backend:     IEEE-754 64-bit Double Engine
 --------------------------------------------------
-  Step 01: [LITERAL] Read '10' -> 10.0
-  Step 02: [LITERAL] Read '3' -> 3.0
-  Step 03: [BINARY]  10.0 SLASH 3.0 = 3.3333333333333335
+  Step 01: [LITERAL] Read '3' -> 3.0
+  Step 02: [LITERAL] Read '4' -> 4.0
+  Step 03: [LITERAL] Read '2' -> 2.0
+  Step 04: [LITERAL] Read '1' -> 1.0
+  Step 05: [BINARY]  2.0 MINUS 1.0 = 1.0
+  Step 06: [LITERAL] Read '3' -> 3.0
+  Step 07: [BINARY]  1.0 CARET 3.0 = 1.0
+  Step 08: [BINARY]  4.0 STAR 1.0 = 4.0
+  Step 09: [BINARY]  3.0 PLUS 4.0 = 7.0
 --------------------------------------------------
-Final Result: 3.3333333333333335
+Final Result: 7.0
 ==================================================
+
+4. Validity checking:
+   Expression '10 / 3 + 2 * 4'      is valid: true
+   Expression '9 + 3 * (2 + 2) / 0' is valid: false
+
+5. Error Handling via Facade:
+   Caught expected error: Calculation failed: 
+
+  10 + * 2
+       ^
+Parse Error: Expected number or '(' but found: '*'
 ```
