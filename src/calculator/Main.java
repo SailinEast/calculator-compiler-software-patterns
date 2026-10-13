@@ -1,56 +1,44 @@
 package calculator;
 
-import calculator.bridge.abstraction.Calculator;
-import calculator.bridge.abstraction.StandardCalculator;
-import calculator.bridge.abstraction.TracedCalculator;
-import calculator.bridge.implementation.BigDecimalMathEngine;
-import calculator.bridge.implementation.DoubleMathEngine;
-import calculator.bridge.implementation.MathEngine;
-
 public class Main {
     public static void main(String[] args) {
         System.out.println("==================================================");
-        System.out.println("   SOFTWARE DESIGN PATTERNS - BRIDGE PATTERN DEMO ");
+        System.out.println("  SOFTWARE DESIGN PATTERNS - FACADE PATTERN DEMO    ");
         System.out.println("==================================================\n");
 
-        // 1. Create Concrete Implementations
-        MathEngine doubleEngine = new DoubleMathEngine();
-        MathEngine bigDecimalEngine = new BigDecimalMathEngine(40);
+        CalculatorFacade calculator = new CalculatorFacade();
 
-        // ================================================================
-        // DEMO 1: Runtime Implementor Switching
-        // (Demonstrates IEEE-754 binary float vs. Arbitrary-Precision decimal)
-        // ================================================================
-        System.out.println("--- DEMO 1: Runtime Implementor Switching ---");
-        String precisionExpr = "0.1 + 0.2";
-        System.out.println("Evaluating: " + precisionExpr);
-
-        // Compose StandardCalculator (Abstraction) with DoubleMathEngine (Implementor)
-        Calculator calculator = new StandardCalculator(doubleEngine);
-        System.out.println("Using: " + calculator.getEngine().getName());
-        System.out.println("Result -> " + calculator.calculate(precisionExpr));
-
-        System.out.println("\n>> [RUNTIME SWAP] Switching engine to BigDecimalMathEngine <<\n");
-
-        // Switch the implementor at runtime without re-creating the calculator or changing the abstraction
-        calculator.setEngine(bigDecimalEngine);
-        System.out.println("Using: " + calculator.getEngine().getName());
-        System.out.println("Result -> " + calculator.calculate(precisionExpr));
+        // 1. Standard evaluation
+        String expr1 = "10 / 3 + 2 * 4";
+        System.out.println("1. Standard Evaluation:");
+        System.out.println("   Expr:   " + expr1);
+        System.out.println("   Result: " + calculator.calculate(expr1));
         System.out.println();
 
-        // ================================================================
-        // DEMO 2: Switching Refined Abstraction (TracedCalculator)
-        // (Demonstrates independent variation on the Abstraction side)
-        // ================================================================
-        System.out.println("--- DEMO 2: Refined Abstraction (Step-by-Step Trace) ---");
-        String complexExpr = "3 + 4 * (2 - 1) ^ 3";
+        // 2. High-precision decimal evaluation
+        String precisionExpr = "0.1 + 0.2";
+        System.out.println("2. High Precision (50 digits):");
+        System.out.println("   Expr:   " + precisionExpr);
+        System.out.println("   Result: " + calculator.calculate(precisionExpr, 50));
+        System.out.println();
 
-        // Compose TracedCalculator with BigDecimalMathEngine
-        Calculator tracedCalculator = new TracedCalculator(bigDecimalEngine);
-        tracedCalculator.calculate(complexExpr);
+        // 3. Step-by-step diagnostic evaluation
+        System.out.println("3. Traced Evaluation:");
+        calculator.calculateWithTrace("3 + 4 * (2 - 1) ^ 3");
 
-        // Swap TracedCalculator implementor back to DoubleMathEngine
-        tracedCalculator.setEngine(doubleEngine);
-        tracedCalculator.calculate("10 / 3");
+        // 4. Expression validity checking
+        String expr2 = "9 + 3 * (2 + 2) / 0";
+        System.out.println("4. Validity checking:");
+        System.out.println("   Expression '" + expr1 + "'      is valid: " + calculator.isValid(expr1));
+        System.out.println("   Expression '" + expr2 + "' is valid: " + calculator.isValid(expr2));
+        System.out.println();
+
+        // 5. Error Handling
+        System.out.println("5. Error Handling via Facade:");
+        try {
+            calculator.calculate("10 + * 2");
+        } catch (Exception e) {
+            System.out.println("   Caught expected error: " + e.getMessage());
+        }
     }
 }
