@@ -37,36 +37,7 @@ This tight coupling forces clients to understand internal compilation mechanics 
 
 ## 3. Architecture & Structural Diagram
 
-### Dual-Facade Architecture
-
-```
-                             +-----------------------------------+
-                             |              CLIENT               |
-                             +-----------------------------------+
-                                       /               \
-              High-level evaluation   /                 \  Static AST analysis
-                                     v                   v
-                    +--------------------+   +--------------------+
-                    |  CalculatorFacade  |   |   FrontendFacade   |
-                    +--------------------+   +--------------------+
-                               |                       |
-   ============================|=======================|=============================
-   COMPLEX SUBSYSTEM BOUNDARY  |                       |   (Zero back-references)
-                               v                       v
-               +------------------------------------------------+
-               |              FRONTEND SUBSYSTEM                |
-               |   Lexer  ──►  Token  ──►  Parser  ──►  Expr    |
-               +------------------------------------------------+
-                                       |
-                                       v (AST Traversal)
-               +------------------------------------------------+
-               |              EVALUATION SUBSYSTEM              |
-               |           Calculator (Standard / Traced)       |
-               |                          │                     |
-               |                          ▼                     |
-               |         MathEngine (Double / BigDecimal)       |
-               +------------------------------------------------+
-```
+![uml_diagram](docs/uml_diagram.png)
 
 ### Detailed Component Roles
 
