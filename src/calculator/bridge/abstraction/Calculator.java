@@ -24,9 +24,7 @@ public abstract class Calculator {
         Objects.requireNonNull(expression, "Expression must not be null");
         if (expression.isBlank()) { return ""; }
 
-        Lexer lexer = new Lexer(expression);
-        Parser parser = new Parser(expression, lexer.tokenize());
-        Expr ast = parser.parse();
+        Expr ast = FrontendFacade.compile(expression);
 
         beforeCalculation(expression);
         Number result = evaluate(ast);
