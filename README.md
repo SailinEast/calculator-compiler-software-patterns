@@ -66,15 +66,6 @@ When invalid syntax or unexpected tokens are encountered, the compiler front-end
 Parse Error: Expected number or '(' but found: '*'
 ```
 
-### Error Diagnostics
-When invalid syntax or unexpected tokens are encountered, the compiler front-end generates compiler-grade visual diagnostics with exact position indicators:
-
-```text
-  3 + * 4
-      ^
-Parse Error: Expected number or '(' but found: '*'
-```
-
 ---
 
 ## 4. Architecture & UML Diagram
