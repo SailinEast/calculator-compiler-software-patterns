@@ -13,6 +13,7 @@ public class Parser {
     }
 
     public Expr parse() {
+        if (isAtEnd()) throw new ParseException("", 0, "Cannot parse blank expression.");
         Expr root = expression();
         if (!isAtEnd()) {
             Token token = peek();
