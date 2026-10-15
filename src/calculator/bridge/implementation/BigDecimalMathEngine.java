@@ -12,6 +12,7 @@ public class BigDecimalMathEngine implements MathEngine {
     }
 
     public BigDecimalMathEngine(int precision) {
+        if (precision <= 0) throw new IllegalArgumentException("Precision must be at least 1.");
         this.mathContext = new MathContext(precision, RoundingMode.HALF_UP);
     }
 
