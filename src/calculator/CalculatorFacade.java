@@ -37,7 +37,7 @@ public class CalculatorFacade {
             MathEngine preciseEngine = new BigDecimalMathEngine(precision);
             Calculator preciseCalculator = new StandardCalculator(preciseEngine);
             return preciseCalculator.calculate(expression);
-        } catch (SyntaxException | ArithmeticException e) {
+        } catch (SyntaxException | ArithmeticException | IllegalArgumentException e) {
             throw new CalculationException("Precision calculation failed: " + e.getMessage());
         }
     }
@@ -58,7 +58,7 @@ public class CalculatorFacade {
             MathEngine preciseEngine = new BigDecimalMathEngine(precision);
             Calculator tracedCalculator = new TracedCalculator(preciseEngine);
             return tracedCalculator.calculate(expression);
-        } catch (SyntaxException | ArithmeticException e) {
+        } catch (SyntaxException | ArithmeticException | IllegalArgumentException e) {
             throw new CalculationException("Traced calculation failed: " + e.getMessage());
         }
     }
