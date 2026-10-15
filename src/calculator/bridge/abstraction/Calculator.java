@@ -69,7 +69,7 @@ public abstract class Calculator {
 
     protected void beforeCalculation(String expression) {}
     protected void afterCalculation(Number result) {}
-    protected abstract void onLiteral(String literal, Number val);
-    protected abstract void onUnary(TokenType op, Number operand, Number result);
-    protected abstract void onBinary(TokenType op, Number left, Number right, Number result);
+    protected void onLiteral(String literal, Number val) {}
+    protected void onUnary(TokenType op, Number operand, Number result) {}
+    protected void onBinary(TokenType op, Number left, Number right, Number result) {}
 }
