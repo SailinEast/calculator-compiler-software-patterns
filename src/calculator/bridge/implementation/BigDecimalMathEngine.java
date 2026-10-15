@@ -68,6 +68,8 @@ public class BigDecimalMathEngine implements MathEngine {
         } catch (ArithmeticException e) {
             // Fallback for fractional exponents
             double result = Math.pow(base.doubleValue(), exponent.doubleValue());
+            if (Double.isNaN(result) || Double.isInfinite(result))
+                throw new ArithmeticException("Unsupported or undefined operation.");
             return new BigDecimal(Double.toString(result), mathContext);
         }
     }

@@ -36,7 +36,10 @@ public class DoubleMathEngine implements MathEngine {
 
     @Override
     public Number power(Number a, Number b) {
-        return Math.pow(a.doubleValue(), b.doubleValue());
+        double result = Math.pow(a.doubleValue(), b.doubleValue());
+        if (Double.isNaN(result) || Double.isInfinite(result))
+            throw new ArithmeticException("Unsupported or undefined operation.");
+        return result;
     }
 
     @Override
