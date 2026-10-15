@@ -77,7 +77,7 @@ public class BigDecimalMathEngine implements MathEngine {
 
     @Override
     public Number negate(Number a) {
-        return toBigDecimal(a).negate();
+        return toBigDecimal(a).negate(mathContext);
     }
 
     @Override
