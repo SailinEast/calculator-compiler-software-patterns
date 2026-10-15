@@ -60,13 +60,12 @@ public class BigDecimalMathEngine implements MathEngine {
     @Override
     public Number power(Number a, Number b) {
         BigDecimal base = toBigDecimal(a);
-        BigDecimal exponent = toBigDecimal(b);
+        BigDecimal exponent = toBigDecimal(b).stripTrailingZeros();
 
         // If exponent is an integer, use exact BigDecimal.pow()
-        try {
-            int intExp = exponent.intValueExact();
-            return base.pow(intExp, mathContext);
-        } catch (ArithmeticException e) {
+        if (exponent.scale() <= 0) {
+            return base.pow(exponent.intValueExact(), mathContext);
+        } else {
             // Fallback for fractional exponents
             double result = Math.pow(base.doubleValue(), exponent.doubleValue());
             if (Double.isNaN(result) || Double.isInfinite(result))
