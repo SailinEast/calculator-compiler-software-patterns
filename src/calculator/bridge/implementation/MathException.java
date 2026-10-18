@@ -1,4 +1,4 @@
-package calculator.frontend;
+package calculator.bridge.implementation;
 
 public class MathException extends RuntimeException {
     public MathException(String message) {

@@ -1,7 +1,5 @@
 package calculator.bridge.implementation;
 
-import calculator.frontend.MathException;
-
 public class DoubleMathEngine implements MathEngine {
     @Override
     public String getName() {

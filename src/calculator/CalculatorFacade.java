@@ -1,7 +1,7 @@
 package calculator;
 
 import calculator.bridge.abstraction.Calculator;
-import calculator.frontend.MathException;
+import calculator.bridge.implementation.MathException;
 import calculator.frontend.SyntaxException;
 
 import java.util.Objects;
