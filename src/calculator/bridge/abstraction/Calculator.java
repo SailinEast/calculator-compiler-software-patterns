@@ -5,7 +5,7 @@ import calculator.frontend.*;
 
 import java.util.Objects;
 
-public abstract class Calculator {
+public class Calculator {
     protected MathEngine engine;
 
     public Calculator(MathEngine engine) {

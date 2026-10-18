@@ -1,7 +1,6 @@
 package calculator;
 
 import calculator.bridge.abstraction.Calculator;
-import calculator.bridge.abstraction.StandardCalculator;
 import calculator.bridge.abstraction.TracedCalculator;
 import calculator.bridge.implementation.BigDecimalMathEngine;
 import calculator.bridge.implementation.DoubleMathEngine;
@@ -51,6 +50,6 @@ public class CalculatorBuilder {
         MathEngine engine = createEngine();
         return (traced)
                 ? new TracedCalculator(engine)
-                : new StandardCalculator(engine);
+                : new Calculator(engine);
     }
 }
