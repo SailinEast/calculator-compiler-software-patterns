@@ -149,8 +149,7 @@ src/
     │   ├── Expr.java                  # Sealed AST hierarchy (Number, Binary, Unary)
     │   ├── SyntaxException.java       # Visual diagnostic base exception
     │   ├── LexException.java          # Scanner syntax error
-    │   ├── ParseException.java        # Grammar syntax error
-    │   └── MathException.java         # Arithmetic evaluation error
+    │   └── ParseException.java        # Grammar syntax error
     │
     └── bridge/                        # Subsystem: Arithmetic & Evaluation Engines
         ├── abstraction/
@@ -160,7 +159,8 @@ src/
         └── implementation/
             ├── MathEngine.java            # Numeric computation SPI
             ├── DoubleMathEngine.java      # IEEE-754 hardware floating-point engine
-            └── BigDecimalMathEngine.java  # Arbitrary-precision decimal engine
+            ├── BigDecimalMathEngine.java  # Arbitrary-precision decimal engine
+            └── MathException.java         # Arithmetic evaluation error
 ```
 
 ---
