@@ -1,5 +1,7 @@
 package calculator.bridge.implementation;
 
+import calculator.frontend.MathException;
+
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;
@@ -52,7 +54,7 @@ public class BigDecimalMathEngine implements MathEngine {
     public Number divide(Number a, Number b) {
         BigDecimal divisor = toBigDecimal(b);
         if (divisor.compareTo(BigDecimal.ZERO) == 0) {
-            throw new ArithmeticException("Division by zero in BigDecimalMathEngine");
+            throw new MathException("Division by zero in BigDecimalMathEngine");
         }
         return toBigDecimal(a).divide(divisor, mathContext);
     }
@@ -69,7 +71,7 @@ public class BigDecimalMathEngine implements MathEngine {
             // Fallback for fractional exponents
             double result = Math.pow(base.doubleValue(), exponent.doubleValue());
             if (Double.isNaN(result) || Double.isInfinite(result))
-                throw new ArithmeticException("Unsupported or undefined operation.");
+                throw new MathException("Unsupported or undefined operation.");
             return new BigDecimal(Double.toString(result), mathContext);
         }
     }

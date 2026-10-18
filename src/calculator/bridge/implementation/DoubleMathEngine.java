@@ -1,5 +1,7 @@
 package calculator.bridge.implementation;
 
+import calculator.frontend.MathException;
+
 public class DoubleMathEngine implements MathEngine {
     @Override
     public String getName() {
@@ -29,7 +31,7 @@ public class DoubleMathEngine implements MathEngine {
     @Override
     public Number divide(Number a, Number b) {
         if (b.doubleValue() == 0.0) {
-            throw new ArithmeticException("Division by zero in DoubleMathEngine");
+            throw new MathException("Division by zero in DoubleMathEngine");
         }
         return a.doubleValue() / b.doubleValue();
     }
@@ -38,7 +40,7 @@ public class DoubleMathEngine implements MathEngine {
     public Number power(Number a, Number b) {
         double result = Math.pow(a.doubleValue(), b.doubleValue());
         if (Double.isNaN(result) || Double.isInfinite(result))
-            throw new ArithmeticException("Unsupported or undefined operation.");
+            throw new MathException("Unsupported or undefined operation.");
         return result;
     }
 

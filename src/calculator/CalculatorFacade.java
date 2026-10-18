@@ -1,6 +1,7 @@
 package calculator;
 
 import calculator.bridge.abstraction.Calculator;
+import calculator.frontend.MathException;
 import calculator.frontend.SyntaxException;
 
 import java.util.Objects;
@@ -56,7 +57,7 @@ public class CalculatorFacade {
         try {
             calculator.calculate(expression);
             return true;
-        } catch (ArithmeticException | SyntaxException e) {
+        } catch (MathException | SyntaxException e) {
             return false;
         }
     }
@@ -65,7 +66,7 @@ public class CalculatorFacade {
         Objects.requireNonNull(expression, "Expression cannot be null.");
         try {
             return calculator.calculate(expression);
-        } catch (SyntaxException | ArithmeticException e) {
+        } catch (SyntaxException | MathException e) {
             throw new CalculationException("Calculation failed: " + e.getMessage());
         }
     }
