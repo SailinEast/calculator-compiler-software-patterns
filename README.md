@@ -93,7 +93,7 @@ A core responsibility of a robust Facade is shielding clients from multi-layer f
   } catch (SyntaxException | MathException e) {
       throw new CalculationException("Calculation failed: " + e.getMessage());
   }
-```
+  ```
 
 ---
 
