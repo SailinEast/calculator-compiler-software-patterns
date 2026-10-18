@@ -1,11 +1,6 @@
 package calculator;
 
 import calculator.bridge.abstraction.Calculator;
-import calculator.bridge.abstraction.StandardCalculator;
-import calculator.bridge.abstraction.TracedCalculator;
-import calculator.bridge.implementation.BigDecimalMathEngine;
-import calculator.bridge.implementation.DoubleMathEngine;
-import calculator.bridge.implementation.MathEngine;
 import calculator.frontend.SyntaxException;
 
 import java.util.Objects;
@@ -14,68 +9,64 @@ import java.util.Objects;
  * A Calculator API that defaults to traceless 64-bit (double) calculation
  */
 public class CalculatorFacade {
-    private final MathEngine engine;
+    private final CalculatorBuilder builder;
     private final Calculator calculator;
+    private final Calculator preciseCalculator;
+    private final Calculator tracedCalculator;
+    private final Calculator preciseTracedCalculator;
 
     public CalculatorFacade() {
-        this.engine = new DoubleMathEngine();
-        this.calculator = new StandardCalculator(engine);
+        this.builder = new CalculatorBuilder();
+        this.calculator = builder.build();
+        this.preciseCalculator = builder.reset().precise().build();
+        this.tracedCalculator = builder.reset().traced().build();
+        this.preciseTracedCalculator = builder.reset().precise().traced().build();
     }
 
-    public String calculate(String expression) {
-        validate(expression);
-        try {
-            return calculator.calculate(expression);
-        } catch (SyntaxException | ArithmeticException e) {
-            throw new CalculationException("Calculation failed: " + e.getMessage());
-        }
+    public String calculateDouble(String expression) {
+        return validateAndCalculate(expression, calculator);
     }
 
-    public String calculate(String expression, int precision) {
-        validate(expression);
-        try {
-            MathEngine preciseEngine = new BigDecimalMathEngine(precision);
-            Calculator preciseCalculator = new StandardCalculator(preciseEngine);
-            return preciseCalculator.calculate(expression);
-        } catch (SyntaxException | ArithmeticException e) {
-            throw new CalculationException("Precision calculation failed: " + e.getMessage());
-        }
+    public String calculatePrecise(String expression) {
+        return validateAndCalculate(expression, preciseCalculator);
     }
 
-    public String calculateWithTrace(String expression) {
-        validate(expression);
-        try {
-            Calculator tracedCalculator = new TracedCalculator(engine);
-            return tracedCalculator.calculate(expression);
-        } catch (SyntaxException | ArithmeticException e) {
-            throw new CalculationException("Traced calculation failed: " + e.getMessage());
-        }
+    public String calculatePrecise(String expression, int precision) {
+        return validateAndCalculate(expression,
+                builder.reset().precision(precision).build());
     }
 
-    public String calculateWithTrace(String expression, int precision) {
-        validate(expression);
-        try {
-            MathEngine preciseEngine = new BigDecimalMathEngine(precision);
-            Calculator tracedCalculator = new TracedCalculator(preciseEngine);
-            return tracedCalculator.calculate(expression);
-        } catch (SyntaxException | ArithmeticException e) {
-            throw new CalculationException("Traced calculation failed: " + e.getMessage());
-        }
+    public String calculateTraced(String expression) {
+        return validateAndCalculate(expression, tracedCalculator);
     }
 
-    public boolean isValid(String expression) {
+    public String calculateTracedPrecise(String expression) {
+        return validateAndCalculate(expression, preciseTracedCalculator);
+    }
+
+    public String calculateTracedPrecise(String expression, int precision) {
+        return validateAndCalculate(expression,
+                builder.reset().precision(precision).traced().build());
+    }
+
+    public boolean canCalculate(String expression) {
         if (expression == null) {
             return false;
         }
         try {
             calculator.calculate(expression);
             return true;
-        } catch (Exception e) {
+        } catch (ArithmeticException | SyntaxException e) {
             return false;
         }
     }
 
-    private void validate(String expression) {
+    private String validateAndCalculate(String expression, Calculator calculator) {
         Objects.requireNonNull(expression, "Expression cannot be null.");
+        try {
+            return calculator.calculate(expression);
+        } catch (SyntaxException | ArithmeticException e) {
+            throw new CalculationException("Calculation failed: " + e.getMessage());
+        }
     }
 }
