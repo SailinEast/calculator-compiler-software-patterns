@@ -6,9 +6,6 @@ import calculator.frontend.SyntaxException;
 
 import java.util.Objects;
 
-/**
- * A Calculator API that defaults to traceless 64-bit (double) calculation
- */
 public class CalculatorFacade {
     private final CalculatorBuilder builder;
     private final Calculator calculator;
