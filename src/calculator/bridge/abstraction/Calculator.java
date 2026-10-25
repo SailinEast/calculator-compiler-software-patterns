@@ -2,22 +2,38 @@ package calculator.bridge.abstraction;
 
 import calculator.bridge.implementation.MathEngine;
 import calculator.frontend.*;
+import calculator.strategy.NumberFormatStrategy;
+import calculator.strategy.PlainDecimalFormatStrategy;
 
 import java.util.Objects;
 
 public class Calculator {
     protected MathEngine engine;
+    protected NumberFormatStrategy formatStrategy;
 
     public Calculator(MathEngine engine) {
+        this(engine, new PlainDecimalFormatStrategy());
+    }
+
+    public Calculator(MathEngine engine, NumberFormatStrategy formatStrategy) {
         this.engine = Objects.requireNonNull(engine, "MathEngine must not be null");
+        this.formatStrategy = Objects.requireNonNull(formatStrategy, "NumberFormatStrategy must not be null");
     }
 
     public void setEngine(MathEngine engine) {
         this.engine = Objects.requireNonNull(engine, "MathEngine must not be null");
     }
 
+    public void setFormatStrategy(NumberFormatStrategy formatStrategy) {
+        this.formatStrategy = Objects.requireNonNull(formatStrategy, "NumberFormatStrategy must not be null");
+    }
+
     public MathEngine getEngine() {
         return engine;
+    }
+
+    public NumberFormatStrategy getFormatStrategy() {
+        return formatStrategy;
     }
 
     public String calculate(String expression) {
@@ -30,7 +46,7 @@ public class Calculator {
         Number result = evaluate(ast);
         afterCalculation(result);
 
-        return engine.format(result);
+        return formatStrategy.format(result);
     }
 
     protected Number evaluate(Expr node) {

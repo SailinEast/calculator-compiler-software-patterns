@@ -9,5 +9,4 @@ public interface MathEngine {
     Number divide(Number a, Number b);
     Number power(Number a, Number b);
     Number negate(Number a);
-    String format(Number value);
 }

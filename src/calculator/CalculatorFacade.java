@@ -3,6 +3,8 @@ package calculator;
 import calculator.bridge.abstraction.Calculator;
 import calculator.bridge.implementation.MathException;
 import calculator.frontend.SyntaxException;
+import calculator.strategy.NumberFormatStrategy;
+import calculator.strategy.PlainDecimalFormatStrategy;
 
 import java.util.Objects;
 
@@ -12,13 +14,23 @@ public class CalculatorFacade {
     private final Calculator preciseCalculator;
     private final Calculator tracedCalculator;
     private final Calculator preciseTracedCalculator;
+    private NumberFormatStrategy currentFormatStrategy;
 
     public CalculatorFacade() {
         this.builder = new CalculatorBuilder();
+        this.currentFormatStrategy = new PlainDecimalFormatStrategy();
         this.calculator = builder.build();
         this.preciseCalculator = builder.reset().precise().build();
         this.tracedCalculator = builder.reset().traced().build();
         this.preciseTracedCalculator = builder.reset().precise().traced().build();
+    }
+
+    public void setFormatStrategy(NumberFormatStrategy formatStrategy) {
+        this.currentFormatStrategy = Objects.requireNonNull(formatStrategy, "Format strategy cannot be null.");
+        this.calculator.setFormatStrategy(formatStrategy);
+        this.preciseCalculator.setFormatStrategy(formatStrategy);
+        this.tracedCalculator.setFormatStrategy(formatStrategy);
+        this.preciseTracedCalculator.setFormatStrategy(formatStrategy);
     }
 
     public String calculateDouble(String expression) {
@@ -31,7 +43,7 @@ public class CalculatorFacade {
 
     public String calculatePrecise(String expression, int precision) {
         return validateAndCalculate(expression,
-                builder.reset().precision(precision).build());
+                builder.reset().precision(precision).format(currentFormatStrategy).build());
     }
 
     public String calculateTraced(String expression) {
@@ -44,7 +56,7 @@ public class CalculatorFacade {
 
     public String calculateTracedPrecise(String expression, int precision) {
         return validateAndCalculate(expression,
-                builder.reset().precision(precision).traced().build());
+                builder.reset().precision(precision).traced().format(currentFormatStrategy).build());
     }
 
     public boolean canCalculate(String expression) {

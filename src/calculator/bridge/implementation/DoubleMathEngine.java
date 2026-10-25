@@ -46,9 +46,4 @@ public class DoubleMathEngine implements MathEngine {
     public Number negate(Number a) {
         return -a.doubleValue();
     }
-
-    @Override
-    public String format(Number value) {
-        return String.valueOf(value.doubleValue());
-    }
 }

@@ -78,9 +78,4 @@ public class BigDecimalMathEngine implements MathEngine {
     public Number negate(Number a) {
         return toBigDecimal(a).negate(mathContext);
     }
-
-    @Override
-    public String format(Number value) {
-        return toBigDecimal(value).stripTrailingZeros().toPlainString();
-    }
 }
