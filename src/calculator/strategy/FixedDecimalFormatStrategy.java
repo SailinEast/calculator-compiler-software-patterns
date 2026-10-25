@@ -17,6 +17,7 @@ public class FixedDecimalFormatStrategy implements NumberFormatStrategy {
     }
 
     @Override
+    @SuppressWarnings("MalformedFormatString")
     public String format(Number value) {
         return String.format("%,." + decimalPlaces + "f", new BigDecimal(value.toString()));
     }
