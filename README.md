@@ -1,37 +1,32 @@
-# AST Calculator — Facade Design Pattern
+# AST Calculator — Strategy Design Pattern
 
 ![Java](https://img.shields.io/badge/Language-Java%2021%2B-orange.svg)
-![Design Pattern](https://img.shields.io/badge/Pattern-Facade%20(GoF)-blue.svg)
-![Clean Code](https://img.shields.io/badge/Clean%20Code-Adherent-green.svg)
+![Design Pattern](https://img.shields.io/badge/Pattern-Strategy%20(GoF)-blue.svg)
+![Clean Code](https://img.shields.io/badge/Clean%20Code-Ch.%2010%20Adherent-green.svg)
 
-An arithmetic expression compiler and computation engine featuring a multi-stage compiler pipeline (**Lexical Scanner $\rightarrow$ Recursive Descent Parser $\rightarrow$ Abstract Syntax Tree**) and dual arithmetic backends (**IEEE-754 64-bit float vs. Arbitrary-Precision BigDecimal**), encapsulated behind the **Gang of Four (GoF) Facade Pattern**.
+An arithmetic expression compiler and computation engine featuring a multi-stage compiler pipeline (**Lexical Scanner $\rightarrow$ Recursive Descent Parser $\rightarrow$ Abstract Syntax Tree**), dual arithmetic backends (**IEEE-754 64-bit float vs. Arbitrary-Precision BigDecimal**), and interchangeable runtime output formatting algorithms powered by the **Gang of Four (GoF) Strategy Pattern**.
 
 ---
 
 ## 1. Problem Statement & Motivation
 
-Directly evaluating mathematical expressions without a facade requires client applications to coordinate a complex, multi-stage subsystem:
-1. Initialize the `Lexer` with character streams and track cursors.
-2. Tokenize and pass the `Token` list into a recursive descent `Parser`.
-3. Handle AST grammar validation and node hierarchies (`Expr`).
-4. Select, configure, and bind a numeric execution backend (`DoubleMathEngine` vs. `BigDecimalMathEngine` with `MathContext`).
-5. Assemble and configure the appropriate calculator abstraction (`Calculator` vs. `TracedCalculator`) via `CalculatorBuilder`.
-6. Catch and resolve low-level compiler and runtime diagnostics (`LexException`, `ParseException`, `MathException`).
+In a mathematical calculator, raw numerical evaluation and result formatting are two fundamentally different responsibilities. Embedding number-formatting logic directly inside `MathEngine` implementations or selecting output formats via `if/else` and `switch` statements inside `Calculator` creates severe architectural flaws:
+1. **Violation of Single Responsibility Principle (SRP):** Arithmetic backends (`DoubleMathEngine`, `BigDecimalMathEngine`) become coupled to string presentation rules rather than focusing solely on numerical computation.
+2. **Rigid Conditional Branching:** Supporting multiple calculator display modes—such as **Plain Decimal (`NORM`)**, **Fixed-Point Grouped (`FIX`)**, and **Scientific Notation (`SCI`)**—via conditional flags forces `Calculator` and `CalculatorBuilder` to modify existing `switch` blocks whenever a new format is introduced.
+3. **Inability to Swap Algorithms at Runtime:** Hardcoding formatting inside engines prevents clients from dynamically switching how results and step-by-step traces are displayed on an active `Calculator` instance without recreating the backend.
 
-This tight coupling forces clients to understand internal compilation mechanics, builder configurations, and arithmetic engine wiring. The **Facade Pattern** solves this by providing unified, high-level interfaces that shield clients from subsystem complexity while keeping the subsystem classes modular, independently usable, and unaware of the facade.
+The **Strategy Pattern** solves this by extracting the family of formatting algorithms into a dedicated `NumberFormatStrategy` hierarchy. The `Calculator` (Context) holds a reference to `NumberFormatStrategy`, delegates formatting execution polymorphically, and allows clients to hot-swap formatting strategies at runtime with **zero conditional branching**.
 
 ---
 
 ## 2. Technical Requirements Mapping
 
-| Assignment Requirement             | Implementation in Project                                                  | Details                                                                                                                                                                                             |
-|:-----------------------------------|:---------------------------------------------------------------------------|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Complex Subsystem (4+ Classes)** | `Lexer`, `Parser`, `Expr`, `Calculator`, `MathEngine`, `CalculatorBuilder` | Real, non-trivial interactions: token stream generation, recursive descent CFG parsing, tree evaluation, and multi-precision arithmetic.                                                            |
-| **Main Facade**                    | `class CalculatorFacade`                                                   | Exposes a streamlined API (`calculateDouble`, `calculatePrecise`, `calculateTraced`, `calculateTracedPrecise`, `canCalculate`) coordinating engine binding, AST compilation, and calculation modes. |
-| **Additional Facade (Optional)**   | `class FrontendFacade`                                                     | A dedicated secondary facade in `calculator.frontend` exposing AST compilation and syntax tree inspection without evaluating.                                                                       |
-| **Client**                         | `class Main` / External Consumers                                          | Interacts exclusively via the Facade API—never instantiates internal subsystem classes directly.                                                                                                    |
-| **Zero Back-References**           | All subsystem classes                                                      | Subsystem classes (`Lexer`, `Parser`, `DoubleMathEngine`, etc.) have **zero imports or dependencies** on `CalculatorFacade` or `FrontendFacade`.                                                    |
-| **Subsystem Bypassability**        | Advanced client support                                                    | Power users and compiler tools can bypass both facades to inspect tokens, construct custom ASTs, or implement custom math engines directly.                                                         |
+| Assignment Requirement          | Implementation in Project                                                                          | Details                                                                                                                                                                                              |
+|:--------------------------------|:---------------------------------------------------------------------------------------------------|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Strategy Interface**          | `interface NumberFormatStrategy`                                                                   | Declares the common execution contract `String format(Number value)` shared by all formatting algorithms.                                                                                            |
+| **Concrete Strategies (3+)**    | `PlainDecimalFormatStrategy`, `FixedDecimalFormatStrategy`, `ScientificFormatStrategy`             | Encapsulate distinct formatting algorithms: trailing-zero stripping plain decimal (`NORM`), locale-grouped fixed scale (`FIX`), and normalized exponential scientific notation (`SCI`).              |
+| **Context**                     | `class Calculator` (and refined `TracedCalculator`)                                                | Holds a reference to `NumberFormatStrategy`, delegates formatting in `calculate()` and trace hooks, and supports dynamic runtime switching via `setFormatStrategy(NumberFormatStrategy)`.            |
+| **Client**                      | `class Main` (plus `CalculatorBuilder` & `CalculatorFacade`)                                       | Configures and switches concrete strategies at runtime on the `Calculator` context—**no `if/else` or `switch` on strategy type exists inside the Context or Builder**.                               |
 
 ---
 
@@ -41,59 +36,59 @@ This tight coupling forces clients to understand internal compilation mechanics,
 
 ### Detailed Component Roles
 
-- **Primary Facade (`CalculatorFacade`):** Orchestrates the full lifecycle of a mathematical evaluation. It coordinates `CalculatorBuilder` to pre-configure standard and traced `Calculator` instances across `DoubleMathEngine` and `BigDecimalMathEngine`, manages runtime `BigDecimal` precision, validates input, and translates subsystem exceptions into unified `CalculationException` instances.
-- **Secondary Facade (`FrontendFacade`):** Segregates static language processing from execution. It coordinates `Lexer` and `Parser` to produce an `Expr` AST or an ASCII syntax tree without executing arithmetic.
-- **Complex Subsystem Classes:**
-   * `Lexer`: Scans input strings into typed tokens with exact character index tracking.
-   * `Parser`: Enforces precedence and associativity using recursive descent.
-   * `Expr` (`Number`, `Unary`, `Binary`): Sealed composite AST node hierarchy.
-   * `Calculator` (`Calculator`, `TracedCalculator`): Traverses the AST using Template Method hooks for silent or step-by-step traced evaluation.
-   * `MathEngine` (`DoubleMathEngine`, `BigDecimalMathEngine`): Implements IEEE-754 or arbitrary-precision `MathContext` arithmetic.
-   * `CalculatorBuilder`: Fluent builder that assembles `Calculator` abstractions and binds them to `MathEngine` implementations.
+- **Strategy Interface (`NumberFormatStrategy`):** Defines the algorithm abstraction `String format(Number value)` that decouples the `Calculator` context from concrete string-formatting implementations.
+- **Concrete Strategies (`calculator.strategy`):**
+  * `PlainDecimalFormatStrategy`: Converts arbitrary `Number` results to `BigDecimal`, strips insignificant trailing zeros (`stripTrailingZeros()`), and renders an exact plain decimal string (`toPlainString()`) without exponential notation.
+  * `FixedDecimalFormatStrategy`: Formats numbers to a configurable number of decimal places (default `2`, or custom `n` places) with thousands grouping separators (`%,.nf`).
+  * `ScientificFormatStrategy`: Normalizes numbers into standard base-10 exponential notation ($m \times 10^n$, formatted as `%E`).
+- **Context (`Calculator` & `TracedCalculator`):** Maintains the active `NumberFormatStrategy` reference. `Calculator.calculate()` delegates final output rendering to `formatStrategy.format(result)`, while `TracedCalculator` delegates formatting of every intermediate AST evaluation step (`onLiteral`, `onUnary`, `onBinary`, `afterCalculation`) to the active strategy.
+- **Fluent Builder & Subsystem Facade (`CalculatorBuilder` & `CalculatorFacade`):**
+  * `CalculatorBuilder`: Reuses shared, immutable `static final` strategy instances (`PLAIN_FORMAT`, `SCIENTIFIC_FORMAT`, `DEFAULT_FIXED_FORMAT`) or accepts custom `NumberFormatStrategy` instances via `.format(strategy)` without conditional branching.
+  * `CalculatorFacade`: Propagates runtime strategy changes across pre-configured standard and traced calculators via `setFormatStrategy(NumberFormatStrategy)`.
 
 ---
 
-## 4. Five Clean Code Principles (Justifications)
+## 4. Five Clean Code Principles (Justifications — Clean Code, Ch. 10)
 
-### 1. Meaningful Names (Self-Explanatory Facade API)
-The public methods of `CalculatorFacade` reflect **client intent** rather than technical subsystem steps:
-- Subsystem operations are granular and imperative: `lexer.tokenize()`, `parser.parse()`, `engine.parseLiteral()`, `builder.reset().precise().build()`.
-- The Facade abstracts these into intuitive, declarative methods:
-   * `calculateDouble(expression)` — evaluates using standard 64-bit IEEE-754 hardware precision.
-   * `calculatePrecise(expression)` / `calculatePrecise(expression, precision)` — evaluates using arbitrary-precision decimal arithmetic (default 34 digits or custom precision).
-   * `calculateTraced(expression)` / `calculateTracedPrecise(...)` — executes step-by-step diagnostic reduction.
-   * `canCalculate(expression)` — verifies whether an expression is syntactically and mathematically valid without throwing exceptions.
+### 1. Elimination of Conditional/Branching Logic in Favor of Polymorphism
+Neither `Calculator` (Context) nor `CalculatorBuilder` uses `if/else` chains or `switch` statements over format type flags (`PLAIN`, `FIXED`, `SCIENTIFIC`). Instead, `Calculator` invokes the strategy polymorphically:
+```java
+public String calculate(String expression) {
+    Objects.requireNonNull(expression, "Expression must not be null");
+    if (expression.isBlank()) { return ""; }
 
-### 2. Single Responsibility Principle (SRP)
-The Facade **coordinates; it does not compute**.
-- `CalculatorFacade` contains zero lexing rules, zero grammar verification code, and zero arithmetic logic.
-- All parsing logic remains strictly within `Parser`, all tokenization remains within `Lexer`, all assembly logic remains within `CalculatorBuilder`, and all mathematical operations remain within `MathEngine`. The Facade solely acts as a traffic controller ensuring subsystem components interact in the proper sequence.
+    Expr ast = FrontendFacade.compile(expression);
 
-### 3. No Leaking of Subsystem Details (Information Hiding)
-The Facade forms a strict abstraction barrier:
-- `CalculatorFacade` accepts only standard types (`String`, `int`) and returns formatted `String` or `boolean` results.
-- Internal subsystem abstractions (`Token`, `TokenType`, `Expr`, `MathEngine`, `Calculator`, `MathContext`) are completely shielded from the client.
-- Low-level subsystem exceptions (`SyntaxException`, `LexException`, `ParseException`, `MathException`) are intercepted and converted into a unified domain exception (`CalculationException`), preventing parser and engine state leakage.
+    beforeCalculation(expression);
+    Number result = evaluate(ast);
+    afterCalculation(result);
 
-### 4. Small, Focused Subsystem Classes (High Cohesion)
-Because `CalculatorFacade` and `FrontendFacade` take on the burden of wiring and lifecycle coordination, subsystem classes remain small, focused, and cohesive:
-- `Lexer` (95 lines) only scans characters into tokens.
-- `Parser` (135 lines) only enforces grammar rules.
-- `BigDecimalMathEngine` only performs arithmetic under a given `MathContext`.
-  None of these classes need boilerplate convenience methods or coordination logic to accommodate external clients.
+    return formatStrategy.format(result);
+}
+```
+Similarly, `CalculatorBuilder` stores a `NumberFormatStrategy` reference directly and reuses immutable strategy constants rather than branching in a factory `switch`.
 
-### 5. Proper Error Handling for Coordination Failures
-A core responsibility of a robust Facade is shielding clients from multi-layer failure cascades:
-- If input is malformed, `Lexer` or `Parser` throws a `SyntaxException` with character-level cursor information.
-- If a division by zero or undefined exponentiation occurs, `MathEngine` throws a `MathException`.
-- `CalculatorFacade` captures these distinct subsystem failures in `validateAndCalculate`, protects client execution flow, and rethrows a descriptive `CalculationException` containing the underlying cause:
-  ```java
-  try {
-      return calculator.calculate(expression);
-  } catch (SyntaxException | MathException e) {
-      throw new CalculationException("Calculation failed: " + e.getMessage());
-  }
-  ```
+### 2. Meaningful, Intention-Revealing Names for Each Strategy
+Every interface, class, and method name in the `calculator.strategy` package immediately communicates its exact algorithmic role:
+- `NumberFormatStrategy` — clearly identifies the Strategy interface for number formatting.
+- `PlainDecimalFormatStrategy` — indicates plain, ungrouped decimal output with trailing zeros stripped.
+- `FixedDecimalFormatStrategy` — indicates fixed fractional scale formatting.
+- `ScientificFormatStrategy` — indicates normalized scientific ($10^n$) notation.
+
+### 3. Single Responsibility Principle (SRP — Clean Code, Ch. 10)
+Following *Clean Code, Chapter 10 (Classes)*, classes should be small, cohesive, and have only **one reason to change**:
+- `format(Number)` was completely removed from `MathEngine`, `DoubleMathEngine`, and `BigDecimalMathEngine`. Now `MathEngine` classes are strictly responsible for numerical arithmetic.
+- Each concrete strategy class encapsulates **one formatting algorithm and nothing else** (`PlainDecimalFormatStrategy` is 12 lines; `ScientificFormatStrategy` is 10 lines; `FixedDecimalFormatStrategy` is 23 lines).
+
+### 4. Context Remains Algorithm-Agnostic (Isolating from Change — Clean Code, Ch. 10)
+`Calculator` and `TracedCalculator` depend solely on the `NumberFormatStrategy` abstraction (Dependency Inversion Principle):
+- The Context has zero knowledge of whether the underlying strategy uses `BigDecimal.stripTrailingZeros()`, `String.format()`, locale grouping, or custom decimal scale parameters.
+- Modifying how `FixedDecimalFormatStrategy` rounds or groups digits has zero impact on `Calculator`.
+
+### 5. Easy Extensibility Demonstrated (Open-Closed Principle — Clean Code, Ch. 10)
+*Clean Code, Chapter 10 ("Organizing for Change")* emphasizes structuring classes so the system can be extended without modifying existing code:
+- Adding a new formatting algorithm (e.g., `EngineeringFormatStrategy`, `CurrencyFormatStrategy`, or `HexadecimalFormatStrategy`) requires only creating a single class implementing `NumberFormatStrategy`.
+- It can be injected immediately via `calculator.setFormatStrategy(new CustomFormatStrategy())` or `builder.format(new CustomFormatStrategy())` **without touching a single line of `Calculator`, `TracedCalculator`, `CalculatorBuilder`, or `CalculatorFacade`**.
 
 ---
 
@@ -121,7 +116,7 @@ NUMBER     ::= [0-9]+ ( "." [0-9]+ )?
 | **5 (Lowest)**  | `+`, `-`        | Addition, Subtraction              | Left-to-Right | `Parser.expression()` |
 
 ### Compiler Diagnostic Errors
-When an invalid expression bypasses client-side validation, the subsystem produces compiler-grade visual diagnostics:
+When an invalid expression is encountered, the frontend subsystem produces compiler-grade visual diagnostics:
 ```text
   3 + * 4
       ^
@@ -135,32 +130,38 @@ Parse Error: Expected number or '(' but found: '*'
 ```text
 src/
 └── calculator/
-    ├── Main.java                      # Client application
-    ├── CalculatorFacade.java          # PRIMARY FACADE (Evaluations & Subsystem Gateway)
-    ├── CalculatorBuilder.java         # Fluent builder for Calculator & MathEngine assembly
-    ├── CalculationException.java      # Unified exception shielding subsystem errors
+    ├── Main.java                                # Client: Demonstrates runtime Strategy switching
+    ├── CalculatorFacade.java                    # Subsystem Facade supporting runtime strategy updates
+    ├── CalculatorBuilder.java                   # Fluent builder with conditional-free strategy binding
+    ├── CalculationException.java                # Unified domain exception
     │
-    ├── frontend/                      # Subsystem: Compiler Front-End
-    │   ├── FrontendFacade.java        # SECONDARY FACADE (AST Compilation & Tree Dump)
-    │   ├── TokenType.java             # Token classification enum
-    │   ├── Token.java                 # Immutable token record
-    │   ├── Lexer.java                 # Lexical character scanner
-    │   ├── Parser.java                # Recursive descent parser
-    │   ├── Expr.java                  # Sealed AST hierarchy (Number, Binary, Unary)
-    │   ├── SyntaxException.java       # Visual diagnostic base exception
-    │   ├── LexException.java          # Scanner syntax error
-    │   └── ParseException.java        # Grammar syntax error
+    ├── strategy/                                # STRATEGY PATTERN: Pluggable Formatting Algorithms
+    │   ├── NumberFormatStrategy.java            # Strategy Interface
+    │   ├── PlainDecimalFormatStrategy.java      # Concrete Strategy 1: Plain decimal (strips trailing zeros)
+    │   ├── FixedDecimalFormatStrategy.java      # Concrete Strategy 2: Grouped fixed decimal places
+    │   └── ScientificFormatStrategy.java        # Concrete Strategy 3: Normalized scientific notation
     │
-    └── bridge/                        # Subsystem: Arithmetic & Evaluation Engines
+    ├── frontend/                                # Subsystem: Compiler Front-End
+    │   ├── FrontendFacade.java                  # Secondary Facade (AST Compilation & Tree Dump)
+    │   ├── TokenType.java                       # Token classification enum
+    │   ├── Token.java                           # Immutable token record
+    │   ├── Lexer.java                           # Lexical character scanner
+    │   ├── Parser.java                          # Recursive descent parser
+    │   ├── Expr.java                            # Sealed AST hierarchy (Number, Binary, Unary)
+    │   ├── SyntaxException.java                 # Visual diagnostic base exception
+    │   ├── LexException.java                    # Scanner syntax error
+    │   └── ParseException.java                  # Grammar syntax error
+    │
+    └── bridge/                                  # Subsystem: Arithmetic & Evaluation Engines
         ├── abstraction/
-        │   ├── Calculator.java        # Silent AST evaluator base (coordinates via FrontendFacade)
-        │   └── TracedCalculator.java  # Step-by-step diagnostic evaluator
+        │   ├── Calculator.java                  # CONTEXT & Bridge Abstraction (delegates to Strategy)
+        │   └── TracedCalculator.java            # Refined Abstraction (formats trace steps via Strategy)
         │
         └── implementation/
-            ├── MathEngine.java            # Numeric computation SPI
-            ├── DoubleMathEngine.java      # IEEE-754 hardware floating-point engine
-            ├── BigDecimalMathEngine.java  # Arbitrary-precision decimal engine
-            └── MathException.java         # Arithmetic evaluation error
+            ├── MathEngine.java                  # Pure numeric computation SPI (SRP compliant)
+            ├── DoubleMathEngine.java            # IEEE-754 hardware floating-point engine
+            ├── BigDecimalMathEngine.java        # Arbitrary-precision decimal engine
+            └── MathException.java               # Arithmetic evaluation error
 ```
 
 ---
@@ -186,44 +187,32 @@ java -cp out calculator.Main
 ## 8. Sample Execution Output
 
 ```text
-==================================================
-  SOFTWARE DESIGN PATTERNS - FACADE PATTERN DEMO    
-==================================================
+====================================================
+  SOFTWARE DESIGN PATTERNS - STRATEGY PATTERN DEMO
+====================================================
 
-1. Double Evaluation:
-   Expr:   10 / 3 + 2 * 4
-   Result: 11.333333333333334
+1. Plain Decimal Format Strategy:
+   1234567.8900 + 0.0000 = 1234567.89
+   1000000 / 3 = 333333.3333333333333333333333333333
+   1 / 8000 = 0.000125
 
-2. High Precision (50 digits):
-   Expr:   0.1 + 0.2
-   Result: 0.3
+2. Fixed Decimal Format Strategy (2 decimal places):
+   1234567.8900 + 0.0000 = 1,234,567.89
+   1000000 / 3 = 333,333.33
+   1 / 8000 = 0.00
 
-3. Traced Evaluation:
-==================================================
-Tracing Expression: 3 + 4 * (2 - 1) ^ 3
-Active Backend:     IEEE-754 64-bit Double Engine
---------------------------------------------------
-  Step 01: [LITERAL] Read '3' -> 3.0
-  Step 02: [LITERAL] Read '4' -> 4.0
-  Step 03: [LITERAL] Read '2' -> 2.0
-  Step 04: [LITERAL] Read '1' -> 1.0
-  Step 05: [BINARY]  2.0 MINUS 1.0 = 1.0
-  Step 06: [LITERAL] Read '3' -> 3.0
-  Step 07: [BINARY]  1.0 CARET 3.0 = 1.0
-  Step 08: [BINARY]  4.0 STAR 1.0 = 4.0
-  Step 09: [BINARY]  3.0 PLUS 4.0 = 7.0
---------------------------------------------------
-Final Result: 7.0
-==================================================
+3. Fixed Decimal Format Strategy (4 decimal places):
+   1234567.8900 + 0.0000 = 1,234,567.8900
+   1000000 / 3 = 333,333.3333
+   1 / 8000 = 0.0001
 
-4. Validity checking:
-   Expression '10 / 3 + 2 * 4'      is valid: true
-   Expression '9 + 3 * (2 + 2) / 0' is valid: false
+4. Scientific Format Strategy:
+   1234567.8900 + 0.0000 = 1.234568E+06
+   1000000 / 3 = 3.333333E+05
+   1 / 8000 = 1.250000E-04
 
-5. Error Handling via Facade:
-   Caught expected error: Calculation failed: 
-
-  10 + * 2
-       ^
-Parse Error: Expected number or '(' but found: '*'
+5. Runtime Strategy Switching on '2 ^ 20 / 7':
+   [Plain]      -> 149796.5714285714285714285714285714
+   [Fixed (2)]  -> 149,796.57
+   [Scientific] -> 1.497966E+05
 ```
